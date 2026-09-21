@@ -1,0 +1,418 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SQL Viewer API",
+    "description": "Consulta paginada de Azure SQL usando una whitelist de objetos. parameters contiene los campos a devolver y filter contiene una expresión OData segura.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "SQL Query Azure Function"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:7071",
+      "description": "Azure Functions Core Tools"
+    },
+    {
+      "url": "https://YOUR_FUNCTION_APP.azurewebsites.net",
+      "description": "Azure Function App"
+    }
+  ],
+  "tags": [
+    {
+      "name": "SQL Viewer",
+      "description": "Consulta parametrizada y paginada de Azure SQL"
+    }
+  ],
+  "paths": {
+    "/api/func_SQL_Viewer": {
+      "get": {
+        "tags": ["SQL Viewer"],
+        "summary": "Consulta una pagina de registros",
+        "description": "Envía object y, opcionalmente, fields en parameters y una expresión OData en filter. Para GET, parameters debe ser un arreglo JSON codificado como texto.",
+        "operationId": "getSqlViewer",
+        "security": [
+          { "functionKeyHeader": [] },
+          { "functionKeyQuery": [] }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Object"
+          },
+          {
+            "$ref": "#/components/parameters/Filter"
+          },
+          {
+            "$ref": "#/components/parameters/OrderBy"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Offset"
+          },
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/IncludeTotal"
+          },
+          {
+            "name": "parameters",
+            "in": "query",
+            "required": false,
+            "description": "Lista de campos a devolver. Ejemplo: [\"ID\", \"Nombre\"].",
+            "schema": {
+              "type": "string",
+              "example": "[\"ID\", \"Nombre\"]"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "502": {
+            "$ref": "#/components/responses/DatabaseError"
+          }
+        }
+      },
+      "post": {
+        "tags": ["SQL Viewer"],
+        "summary": "Consulta una pagina de registros",
+        "description": "Ejecuta una consulta parametrizada sobre el objeto permitido. parameters define los campos y filter usa OData: eq, ne, gt, ge, lt, le, and, or, contains, startswith y endswith.",
+        "operationId": "postSqlViewer",
+        "security": [
+          { "functionKeyHeader": [] },
+          { "functionKeyQuery": [] }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryRequest"
+              },
+              "examples": {
+                "filterByStatus": {
+                  "summary": "Filtrar por estado y devolver 50 registros",
+                  "value": {
+                    "object": "CLIENTES",
+                    "parameters": ["ID", "Nombre", "Enabled"],
+                    "filter": "Enabled eq true",
+                    "limit": 50,
+                    "offset": 0,
+                    "include_total": true
+                  }
+                },
+                "facturas": {
+                  "summary": "Consultar el objeto FACTURAS",
+                  "value": {
+                    "object": "FACTURAS",
+                    "parameters": ["ID", "FechaIngreso"],
+                    "filter": "ID gt 100",
+                    "order_by": "Id",
+                    "limit": 25,
+                    "offset": 0,
+                    "include_total": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/ConfigurationError"
+          },
+          "502": {
+            "$ref": "#/components/responses/DatabaseError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "functionKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-functions-key",
+        "description": "Function key de Azure Functions. En Swagger UI usar la clave en Authorize."
+      },
+      "functionKeyQuery": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "code",
+        "description": "Alternativa para enviar la Function key como parametro code."
+      }
+    },
+    "parameters": {
+      "Page": {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "description": "Numero de pagina, comenzando en 1.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        }
+      },
+      "PageSize": {
+        "name": "page_size",
+        "in": "query",
+        "required": false,
+        "description": "Cantidad maxima de registros por pagina. La funcion la limita a SQL_MAX_RECORDS.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 50
+        }
+      },
+      "Object": {
+        "name": "object",
+        "in": "query",
+        "required": true,
+        "description": "Objeto permitido sin schema. Valores iniciales: FACTURAS o CLIENTES.",
+        "schema": {
+          "type": "string",
+          "enum": ["FACTURAS", "CLIENTES"],
+          "example": "CLIENTES"
+        }
+      },
+      "Filter": {
+        "name": "filter",
+        "in": "query",
+        "required": false,
+        "description": "Expresión OData segura. Ejemplo: Enabled eq true and contains(Nombre, 'ACME').",
+        "schema": {
+          "type": "string",
+          "example": "Enabled eq true"
+        }
+      },
+      "OrderBy": {
+        "name": "order_by",
+        "in": "query",
+        "required": false,
+        "description": "Columna o expresion de orden. Si se omite, usa SQL_ORDER_BY.",
+        "schema": {
+          "type": "string",
+          "example": "Id"
+        }
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "description": "Cantidad maxima de registros. Alias de page_size.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 50
+        }
+      },
+      "Offset": {
+        "name": "offset",
+        "in": "query",
+        "required": false,
+        "description": "Cantidad de registros a saltar. Si se envía, tiene prioridad sobre page.",
+        "schema": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        }
+      },
+      "IncludeTotal": {
+        "name": "include_total",
+        "in": "query",
+        "required": false,
+        "description": "Si es true, ejecuta tambien COUNT_BIG y devuelve pagination.total.",
+        "schema": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "schemas": {
+      "QueryRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["object"],
+        "properties": {
+          "parameters": {
+            "type": "array",
+            "description": "Campos a devolver del objeto. Si se omite o se envía vacío, usa SQL_SELECT_COLUMNS.",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+            },
+            "default": []
+          },
+          "object": {
+            "type": "string",
+            "description": "Objeto permitido sin schema. El schema se configura en SQL_OBJECT_SCHEMA.",
+            "enum": ["FACTURAS", "CLIENTES"],
+            "example": "CLIENTES"
+          },
+          "order_by": {
+            "type": "string",
+            "description": "Orden para OFFSET/FETCH. Si se omite, usa SQL_ORDER_BY.",
+            "example": "Id"
+          },
+          "filter": {
+            "type": "string",
+            "description": "Expresión OData segura para filtrar registros.",
+            "example": "Enabled eq true and contains(Nombre, 'ACME')"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 50
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 50
+          },
+          "include_total": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "QueryResponse": {
+        "type": "object",
+        "required": ["data", "pagination"],
+        "properties": {
+          "data": {
+            "type": "array",
+            "description": "Registros devueltos. Las propiedades dependen de SQL_SELECT_COLUMNS.",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "required": ["page", "page_size", "limit", "offset", "returned", "has_more", "next_page", "max_records"],
+        "properties": {
+          "page": { "type": "integer", "example": 1 },
+          "page_size": { "type": "integer", "example": 50 },
+          "limit": { "type": "integer", "example": 50 },
+          "offset": { "type": "integer", "example": 0 },
+          "returned": { "type": "integer", "example": 50 },
+          "has_more": { "type": "boolean", "example": true },
+          "next_page": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Siguiente numero de pagina o null cuando no quedan registros.",
+            "example": 2
+          },
+          "max_records": { "type": "integer", "example": 1000 },
+          "total": {
+            "type": "integer",
+            "description": "Solo aparece cuando include_total es true.",
+            "example": 245
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "La pagina solicitada supera el maximo configurado de 1000 registros."
+          }
+        }
+      }
+    },
+    "responses": {
+      "Success": {
+        "description": "Consulta ejecutada correctamente.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/QueryResponse"
+            },
+            "example": {
+              "data": [
+                {
+                  "Id": 1,
+                  "Nombre": "Cliente demo",
+                  "Estado": "Activo"
+                }
+              ],
+              "pagination": {
+                "page": 1,
+                "page_size": 50,
+                "limit": 50,
+                "offset": 0,
+                "returned": 1,
+                "has_more": false,
+                "next_page": null,
+                "max_records": 1000,
+                "total": 1
+              }
+            }
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "Parametros invalidos o pagina fuera del limite.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "ConfigurationError": {
+        "description": "Falta o es invalida una variable de configuracion del servidor.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "DatabaseError": {
+        "description": "No fue posible conectar o consultar Azure SQL.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    }
+  }
+}
